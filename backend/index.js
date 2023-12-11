@@ -1,12 +1,13 @@
 const express = require("express"); // express를 가져온다.
 const app = express(); // express를 이용해서 app을 만들어준다.
-const port = process.env.PORT || 5000; // port 번호를 5000번으로 설정
-const mailer = require("nodemailer");
+require('dotenv').config(); 
 
 const bodyParser = require("body-parser");
 const cookieParser = require("cookie-parser");
-const { User } = require("./models/User.js"); // 모델 스키마 가져오기
+const { User } = require("./database/models/User.js"); // 모델 스키마 가져오기
 const { auth } = require("./middleware/auth.js");
+const { mongoose } = require("./database/connect.js");
+const { transporter } = require("./config/mailer.js")
 
 // application/x-www-form-urlencoded
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -14,21 +15,47 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(cookieParser());
 
-const mongoose = require("mongoose");
-mongoose // 몽구스를 이용해서 mongoDB에 연결
-  .connect('mongodb+srv://Admin:zx3L4sMyZN9TbNsx@cluster0.d7wobov.mongodb.net/?retryWrites=true&w=majority', {
-    // useNewUrlParser: true,
-    // useUnifiedTopology: true,
-  })
-  .then(() => console.log("MongoDB Connected..."))
-  .catch((err) => console.log(err));
-
 app.get("/api/users/", (req, res) => res.send("Hello World! 안녕하세요~"));
 
-app.post("/api/users/signup", (req, res) => {
+app.get("/api/auths/email", (req, res) => {
+  var email = req.query.email;
+  console.log(email)
+  User.findOne(
+    {
+      email: email,
+    },
+    (err, user) => {
+      if (user) {
+        console.error(err)
+        return res.json({
+          success: false,
+          info: null,
+          error: {
+            message: "이미 가입된 이메일입니다.",
+            status: 400
+          }
+        });
+      }else{
+        return res.json({
+          success: true,
+          info: "사용가능한 이메일입니다.",
+          status: 200
+        });
+      }
+    }
+  )
+})
+
+const generateRandom = function() {
+  const randomCode = Math.floor(100000 + Math.random() * 900000);
+  return randomCode;
+}
+
+let randomCode;
+
+app.post("/api/auths/signup", (req, res) => {
   // 회원 가입 할 때 필요한 정보들을 client에서 가져오면 그것들을 데이터베이스에 넣어준다.
   const user = new User(req.body); // body parser를 이용해서 json 형식으로 정보를 가져온다.
-  const randomCode = Math.floor(100000 + Math.random() * 900000);
 
   user.save((err, userInfo) => {
     // 몽고디비에서 오는 메소드
@@ -40,7 +67,45 @@ app.post("/api/users/signup", (req, res) => {
   });
 });
 
-app.post("/api/users/login", (req, res) => {
+app.get("/api/auths/signup/email-send", (req, res) => {
+  const user = new User(req.body);
+  randomCode = generateRandom();
+  let mailOptions = {
+    from: process.env.USER, //송신할 이메일
+    to: user.email, //수신할 이메일
+    subject: "mail test",
+    html: randomCode.toString(),
+    // attachments: "첨부파일",
+  };
+  transporter.sendMail(mailOptions)
+  return res.json({
+    message: "이메일 전송 완료"
+  });
+})
+
+app.get("/api/auths/signup/email-verification", (req, res) => {
+  const userCode = req.body.code;
+  
+  if(userCode===randomCode){
+    return res.json({
+      success: true,
+      info: "인증되었습니다.",
+      status: 200
+    });
+  }else{
+    return res.json({
+      success: false,
+      info: null,
+      error: {
+        message: "인증코드가 다릅니다.",
+        status: 400
+      }
+    });
+  }
+
+})
+
+app.post("/api/auths/login", (req, res) => {
   // 요청된 이메일을 데이터베이스에 있는지 찾는다.
   User.findOne(
     {
@@ -76,7 +141,7 @@ app.post("/api/users/login", (req, res) => {
 });
 
 // auth 미들웨어를 통과해야 다음으로 넘어감
-app.get("/api/users/auth", auth, (req, res) => {
+app.get("/api/auths/auth", auth, (req, res) => {
   // 여기까지 미들웨어를 통과해 왔다는 얘기는 Authentication이 true라는 말
   res.status(200).json({
     _id: req.user._id,
@@ -84,13 +149,13 @@ app.get("/api/users/auth", auth, (req, res) => {
     isAuth: true,
     email: req.user.email,
     name: req.user.name,
-    lastname: req.user.lastname,
-    role: req.user.role,
-    image: req.user.image,
+    // lastname: req.user.lastname,
+    // role: req.user.role,
+    // image: req.user.image,
   });
 });
 
-app.get("/api/users/logout", auth, (req, res) => {
+app.get("/api/auths/logout", auth, (req, res) => {
   console.log(req.user);
   User.findOneAndUpdate({ _id: req.user._id }, { token: "" }, (err, user) => {
     if (err) return res.json({ success: false, err });

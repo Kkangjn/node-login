@@ -2,6 +2,7 @@ const mongoose = require("mongoose"); // 몽구스를 가져온다.
 const bcrypt = require("bcrypt"); // 비밀번호를 암호화 시키기 위해
 const saltRounds = 10; // salt를 몇 글자로 할지
 const jwt = require("jsonwebtoken"); // 토큰을 생성하기 위해
+require('dotenv').config(); 
 
 const userSchema = mongoose.Schema({
   name: {

@@ -1,4 +1,4 @@
-const { User } = require("../models/User");
+const { User } = require("../database/models/User");
 
 // 인증 처리하는 곳
 let auth = (req, res, next) => {
