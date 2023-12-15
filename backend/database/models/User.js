@@ -54,28 +54,6 @@ userSchema.pre("save", function (next) {
   }
 });
 
-// 비밀번호를 비교하는 메소드
-userSchema.methods.comparePassword = function (plainPassword, cb) {
-  const user = this;
-  // plainPassword를 암호화해서 db에 있는 비밀번호와 비교
-  bcrypt.compare(plainPassword, user.password, function (err, isMatch) {
-    if (err) return cb(err);
-    cb(null, isMatch);
-  });
-};
-
-// 토큰을 생성하는 메소드
-userSchema.methods.generateToken = function (cb) {
-  const user = this;
-  // jsonwebtoken을 이용해서 token을 생성하기
-  const token = jwt.sign(user._id.toHexString(), process.env.SECRET_KEY);
-  user.token = token;
-  user.save(function (err, user) {
-    if (err) return cb(err);
-    cb(null, user);
-  });
-};
-
 // 토큰을 복호화하는 메소드
 userSchema.statics.findByToken = function (token, cb) {
   const user = this;
